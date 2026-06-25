@@ -20,7 +20,7 @@ class NativeTvTextFieldView(
     private val viewId: Int,
     private val creationParams: Map<String, Any>?,
     private val messenger: BinaryMessenger,
-    private val plugin: NativeTvTextFieldPlugin
+    private val plugin: NativeTextfieldTvPlugin
 ) : PlatformView {
     private val tag = "NativeTvTextFieldView"
     private val editText: EditText
@@ -47,7 +47,7 @@ class NativeTvTextFieldView(
             val bgColor = parseColor(creationParams?.get("backgroundColor"), Color.BLACK)
             setBackgroundColor(bgColor)
             val obscureText = creationParams?.get(ChannelConst.ARG_OBSCURE_TEXT) as? Boolean ?: false
-            applyObscureMode(obscureText)
+            applyObscureModeInternal(this, obscureText)
             val maxLines = creationParams?.get("maxLines") as? Int ?: 1
             setLines(maxLines)
             imeOptions = EditorInfo.IME_ACTION_DONE
@@ -106,15 +106,15 @@ class NativeTvTextFieldView(
         }
     }
 
-    private fun applyObscureMode(obscure: Boolean) {
-        Log.d(tag, "update obscureText = $obscure")
-        val cursorPos = editText.selectionStart
+    private fun applyObscureModeInternal(targetEditText: EditText, obscure: Boolean) {
+        val cursorPos = targetEditText.selectionStart
         val inputBase = android.text.InputType.TYPE_CLASS_TEXT
         val passwordFlag = android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
-        editText.transformationMethod = if (obscure) PasswordTransformationMethod.getInstance() else null
-        editText.inputType = if (obscure) inputBase or passwordFlag else inputBase
-        editText.setSelection(cursorPos)
-        Log.d(tag, "obscure updated, cursor = $cursorPos")
+        targetEditText.transformationMethod = if (obscure) PasswordTransformationMethod.getInstance() else null
+        targetEditText.inputType = if (obscure) inputBase or passwordFlag else inputBase
+        if (cursorPos >= 0 && cursorPos <= targetEditText.text.length) {
+            targetEditText.setSelection(cursorPos)
+        }
     }
 
     fun setText(text: String) {
@@ -149,7 +149,7 @@ class NativeTvTextFieldView(
     }
 
     fun setObscureText(obscure: Boolean) {
-        editText.post { applyObscureMode(obscure) }
+        editText.post { applyObscureModeInternal(editText, obscure) }
     }
 
     fun moveCursor(direction: String) {

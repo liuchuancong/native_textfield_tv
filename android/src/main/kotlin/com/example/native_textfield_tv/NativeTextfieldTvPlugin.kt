@@ -40,7 +40,7 @@ object ErrorCode {
     const val INVALID_CURSOR_DIRECTION = "INVALID_MOVE_CURSOR"
 }
 
-class NativeTvTextFieldPlugin : FlutterPlugin, MethodCallHandler {
+class NativeTextfieldTvPlugin : FlutterPlugin, MethodCallHandler {
     private lateinit var methodChannel: MethodChannel
     private lateinit var binaryMessenger: BinaryMessenger
     private val activeViewMap = mutableMapOf<Int, NativeTvTextFieldView>()
@@ -159,7 +159,7 @@ class NativeTvTextFieldPlugin : FlutterPlugin, MethodCallHandler {
 class NativeTvTextFieldFactory(
     private val messenger: BinaryMessenger,
     private val viewCache: MutableMap<Int, NativeTvTextFieldView>,
-    private val plugin: NativeTvTextFieldPlugin
+    private val plugin: NativeTextfieldTvPlugin 
 ) : PlatformViewFactory(StandardMessageCodec.INSTANCE) {
     @Suppress("UNCHECKED_CAST")
     override fun create(
