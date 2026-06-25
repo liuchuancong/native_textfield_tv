@@ -1,15 +1,16 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-
 import 'native_textfield_tv_platform_interface.dart';
 
+/// NativeTextfieldTv plugin
 class NativeTextfieldTv {
   Future<String?> getPlatformVersion() {
     return NativeTextfieldTvPlatform.instance.getPlatformVersion();
   }
 }
 
+/// Controller for NativeTextField
 class NativeTextFieldController extends TextEditingController {
   ValueChanged<bool>? onFocusChanged;
   bool _isUpdatingFromNative = false;
@@ -22,9 +23,7 @@ class NativeTextFieldController extends TextEditingController {
 
   void _setTextFromNative(String text) {
     _isUpdatingFromNative = true;
-    if (this.text != text) {
-      this.text = text;
-    }
+    if (this.text != text) this.text = text;
     _isUpdatingFromNative = false;
   }
 
@@ -32,11 +31,6 @@ class NativeTextFieldController extends TextEditingController {
 
   Future<void> setText(String text) async {
     this.text = text;
-  }
-
-  @override
-  void dispose() {
-    super.dispose();
   }
 }
 
@@ -48,11 +42,14 @@ class NativeTextField extends StatefulWidget {
   final FocusNode? focusNode;
   final ValueChanged<String>? onChanged;
   final ValueChanged<bool>? onFocusChanged;
+  final ValueChanged<String>? onSubmitted;
   final bool enabled;
   final double? width;
   final double? height;
   final bool obscureText;
   final int? maxLines;
+  final Color backgroundColor;
+  final Color textColor;
 
   const NativeTextField({
     super.key,
@@ -62,11 +59,14 @@ class NativeTextField extends StatefulWidget {
     this.focusNode,
     this.onChanged,
     this.onFocusChanged,
+    this.onSubmitted,
     this.enabled = true,
     this.width,
     this.height,
     this.obscureText = false,
     this.maxLines = 1,
+    this.backgroundColor = Colors.black,
+    this.textColor = Colors.white,
   });
 
   @override
@@ -86,15 +86,12 @@ class _NativeTextFieldState extends State<NativeTextField> {
     super.initState();
     _instanceId = _nextInstanceId++;
     _instances[_instanceId] = this;
-    
-    if (widget.controller != null) {
-      _controller = widget.controller!;
-    } else {
-      _controller = NativeTextFieldController();
-      _isControllerCreated = true;
-    }
 
-    // 设置回调
+    _controller = widget.controller ?? NativeTextFieldController();
+    _isControllerCreated = widget.controller == null;
+
+    // Listen to controller changes
+    _controller.addListener(_onControllerTextChanged);
     if (widget.onChanged != null) {
       _controller.addListener(() {
         if (!_controller.isUpdatingFromNative) {
@@ -104,22 +101,16 @@ class _NativeTextFieldState extends State<NativeTextField> {
     }
     _controller.onFocusChanged = widget.onFocusChanged;
 
-    // 监听 controller 的文本变化，同步到原生端
-    _controller.addListener(_onControllerTextChanged);
-
     _initializeChannel();
   }
 
   void _onControllerTextChanged() {
-    if (!_controller.isUpdatingFromNative) {
-      _syncToNative();
-    }
+    if (!_controller.isUpdatingFromNative) _syncToNative();
   }
 
   static Future<dynamic> _handleMethodCall(MethodCall call) async {
     final instanceId = call.arguments['instanceId'] as int?;
     final instance = _instances[instanceId];
-
     if (instance == null) return;
 
     switch (call.method) {
@@ -131,6 +122,10 @@ class _NativeTextFieldState extends State<NativeTextField> {
         final hasFocus = call.arguments['hasFocus'] as bool? ?? false;
         instance._controller.onFocusChanged?.call(hasFocus);
         break;
+      case 'onSubmitted':
+        final text = call.arguments['text'] as String? ?? '';
+        instance.widget.onSubmitted?.call(text);
+        break;
     }
   }
 
@@ -139,79 +134,57 @@ class _NativeTextFieldState extends State<NativeTextField> {
   }
 
   void _syncToNative() {
-    _channel.invokeMethod('setText', {
-      'instanceId': _instanceId,
-      'text': _controller.text,
-    });
+    _channel.invokeMethod('setText', {'instanceId': _instanceId, 'text': _controller.text});
   }
 
   Future<void> requestFocus() async {
-    await _channel.invokeMethod('requestFocus', {
-      'instanceId': _instanceId,
-    });
+    await _channel.invokeMethod('requestFocus', {'instanceId': _instanceId});
   }
 
   Future<void> clearFocus() async {
-    await _channel.invokeMethod('clearFocus', {
-      'instanceId': _instanceId,
-    });
+    await _channel.invokeMethod('clearFocus', {'instanceId': _instanceId});
   }
 
   Future<void> moveCursorLeft() async {
-    await _channel.invokeMethod('moveCursor', {
-      'instanceId': _instanceId,
-      'direction': 'left',
-    });
+    await _channel.invokeMethod('moveCursor', {'instanceId': _instanceId, 'direction': 'left'});
   }
 
   Future<void> moveCursorRight() async {
-    await _channel.invokeMethod('moveCursor', {
+    await _channel.invokeMethod('moveCursor', {'instanceId': _instanceId, 'direction': 'right'});
+  }
+
+  Future<void> setObscureText(bool obscure) async {
+    // Update internal state
+    setState(() {
+      // We don't actually store obscureText here, just forward to native
+    });
+
+    // Call native method
+    await _channel.invokeMethod('setObscureText', {
       'instanceId': _instanceId,
-      'direction': 'right',
+      'obscureText': obscure,
     });
   }
 
   @override
-  void didUpdateWidget(NativeTextField oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.controller != oldWidget.controller) {
-      // 清理旧的监听器
-      _controller.removeListener(_onControllerTextChanged);
-      if (oldWidget.onChanged != null) {
-        _controller.removeListener(() {
-          oldWidget.onChanged!(_controller.text);
-        });
-      }
-      
-      if (oldWidget.controller == null && widget.controller != null) {
-        _controller = widget.controller!;
-        _isControllerCreated = false;
-      } else if (oldWidget.controller != null && widget.controller == null) {
-        _controller = NativeTextFieldController();
-        _isControllerCreated = true;
-      }
-
-      // 重新设置回调
-      if (widget.onChanged != null) {
-        _controller.addListener(() {
-          if (!_controller.isUpdatingFromNative) {
-            widget.onChanged!(_controller.text);
-          }
-        });
-      }
-      _controller.onFocusChanged = widget.onFocusChanged;
-      _controller.addListener(_onControllerTextChanged);
-    }
+  void dispose() {
+    _instances.remove(_instanceId);
+    if (_instances.isEmpty) _channel.setMethodCallHandler(null);
+    _controller.removeListener(_onControllerTextChanged);
+    if (_isControllerCreated) _controller.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final Map<String, dynamic> creationParams = <String, dynamic>{
+    final Map<String, dynamic> creationParams = {
       'instanceId': _instanceId,
       'hint': widget.hint,
       'initialText': widget.initialText,
       'obscureText': widget.obscureText,
       'maxLines': widget.maxLines,
+      'backgroundColor': widget.backgroundColor.toARGB32(),
+      'textColor': widget.textColor.toARGB32(),
     };
 
     Widget child = AndroidView(
@@ -222,41 +195,19 @@ class _NativeTextFieldState extends State<NativeTextField> {
     );
 
     if (widget.width != null || widget.height != null) {
-      return SizedBox(
-        width: widget.width,
-        height: widget.height,
-        child: child,
-      );
+      return SizedBox(width: widget.width, height: widget.height, child: child);
     }
-
     return child;
   }
 
   void _onPlatformViewCreated(int id) {
-    // AndroidView 创建完成后，同步 controller 的当前文本到原生端
-    // 如果 controller 有文本内容且与 initialText 不同，则同步到原生端
-    if (_controller.text.isNotEmpty && 
-        _controller.text != widget.initialText) {
+    if (_controller.text.isNotEmpty && _controller.text != widget.initialText) {
       _syncToNative();
     }
   }
-
-  @override
-  void dispose() {
-    _instances.remove(_instanceId);
-    if (_instances.isEmpty) {
-      _channel.setMethodCallHandler(null);
-    }
-    
-    _controller.removeListener(_onControllerTextChanged);
-    
-    if (_isControllerCreated) {
-      _controller.dispose();
-    }
-    super.dispose();
-  }
 }
 
+/// DPAD constants
 const String keyUp = 'Arrow Up';
 const String keyDown = 'Arrow Down';
 const String keyLeft = 'Arrow Left';
@@ -264,36 +215,50 @@ const String keyRight = 'Arrow Right';
 const String keyCenter = 'Select';
 const String goBack = 'Go Back';
 
-class DpadNativeTextField extends StatefulWidget {
+/// DPAD NativeTextField with eye toggle
+class AndroidTVTextField extends StatefulWidget {
   final FocusNode focusNode;
   final NativeTextFieldController controller;
   final double height;
   final bool obscureText;
   final String? hint;
   final int? maxLines;
-  //final int? minLines;
+  final Color backgroundColor;
+  final Color textColor;
+  final Color focuesedBorderColor;
+  final Color unFocuesedBorderColor;
 
-  const DpadNativeTextField({
-    super.key,
-    required this.focusNode,
-    required this.controller,
-    this.height = 48,
-    this.obscureText = false,
-    this.hint,
-    this.maxLines = 1,
-    //this.minLines,
-  });
+  final bool showPasswordToggle;
+  final ValueChanged<String>? onSubmitted;
+  final Widget? postFixWidget;
+
+  const AndroidTVTextField(
+      {super.key,
+      required this.focusNode,
+      required this.controller,
+      this.height = 60,
+      this.obscureText = false,
+      this.hint,
+      this.maxLines = 1,
+      this.showPasswordToggle = false,
+      this.backgroundColor = Colors.black,
+      this.textColor = Colors.white,
+      this.onSubmitted,
+      this.focuesedBorderColor = Colors.transparent,
+      this.unFocuesedBorderColor = Colors.transparent,
+      this.postFixWidget});
 
   @override
-  State<DpadNativeTextField> createState() => _DpadNativeTextFieldState();
+  State<AndroidTVTextField> createState() => _DpadNativeTextFieldState();
 }
 
-class _DpadNativeTextFieldState extends State<DpadNativeTextField> {
+class _DpadNativeTextFieldState extends State<AndroidTVTextField> {
   final GlobalKey<_NativeTextFieldState> _nativeTextFieldKey = GlobalKey<_NativeTextFieldState>();
 
   @override
   void initState() {
     super.initState();
+
     widget.focusNode.addListener(_handleFocusChange);
   }
 
@@ -331,14 +296,37 @@ class _DpadNativeTextFieldState extends State<DpadNativeTextField> {
           }
         }
       },
-      child: NativeTextField(
-        key: _nativeTextFieldKey,
-        controller: widget.controller,
-        width: double.infinity,
-        height: widget.height,
-        obscureText: widget.obscureText,
-        hint: widget.hint,
-        maxLines: widget.maxLines,
+      child: Stack(
+        alignment: Alignment.centerRight,
+        children: [
+          Builder(builder: (context) {
+            return Container(
+              height: widget.height,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(10),
+                color: widget.backgroundColor,
+                border: Border.all(
+                  color: widget.focusNode.hasFocus ? Colors.green : Colors.amber,
+                  width: 1,
+                ),
+              ),
+              padding: EdgeInsets.only(left: 5, right: widget.postFixWidget == null ? 5 : 50, top: 5, bottom: 5),
+              child: NativeTextField(
+                key: _nativeTextFieldKey,
+                controller: widget.controller,
+                width: double.infinity,
+                height: widget.height,
+                obscureText: widget.obscureText,
+                hint: widget.hint,
+                maxLines: widget.maxLines,
+                backgroundColor: widget.backgroundColor,
+                textColor: widget.textColor,
+                onSubmitted: widget.onSubmitted,
+              ),
+            );
+          }),
+          Positioned(right: 10, child: widget.postFixWidget ?? SizedBox()),
+        ],
       ),
     );
   }

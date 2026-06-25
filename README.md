@@ -275,8 +275,8 @@ This plugin provides a native Android solution that bypasses this limitation by 
 ```
 lib/
 ├── native_textfield_tv.dart              # Main API
-├── native_textfield_tv_platform_interface.dart  # 平台接口
-└── native_textfield_tv_method_channel.dart      # 方法通道实现
+├── native_textfield_tv_platform_interface.dart
+└── native_textfield_tv_method_channel.dart     
 
 android/src/main/kotlin/com/example/native_textfield_tv/
 ├── NativeTextfieldTvPlugin.kt            # Plugin main class

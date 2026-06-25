@@ -4,96 +4,124 @@ import android.content.Context
 import android.graphics.Color
 import android.text.Editable
 import android.text.TextWatcher
+import android.text.method.PasswordTransformationMethod
+import android.view.KeyEvent
 import android.view.View
+import android.view.inputmethod.EditorInfo
 import android.widget.EditText
-import android.widget.FrameLayout
+import android.widget.TextView
+import android.util.Log
 import io.flutter.plugin.common.BinaryMessenger
-import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.platform.PlatformView
 
-class NativeTextfieldTvView(
+class NativeTvTextFieldView(
     private val context: Context,
     private val viewId: Int,
-    private val creationParams: Map<String?, Any?>?,
-    private val messenger: BinaryMessenger
+    private val creationParams: Map<String, Any>?,
+    private val messenger: BinaryMessenger,
+    private val plugin: NativeTvTextFieldPlugin
 ) : PlatformView {
-
+    private val tag = "NativeTvTextFieldView"
     private val editText: EditText
     private val methodChannel: MethodChannel
+    private val instanceId: Int
+    private var textWatcher: TextWatcher? = null
 
     init {
-        // 创建EditText
-        editText = EditText(context).apply {
-            // 设置基本样式
-            setTextColor(Color.BLACK)
-            setBackgroundColor(Color.WHITE)
-            setPadding(16, 16, 16, 16)
-            
-            // 设置提示文本
-            hint = creationParams?.get("hint") as? String ?: "请输入文本"
-            
-            // 设置初始文本
-            val initialText = creationParams?.get("initialText") as? String
-            if (initialText != null) {
-                setText(initialText.toString())
-            }
-            
-            // 设置密码模式
-            val obscureText = creationParams?.get("obscureText") as? Boolean ?: false
-            if (obscureText) {
-                inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
-            }
+        instanceId = creationParams?.get(ChannelConst.ARG_INSTANCE_ID) as? Int ?: viewId
+        editText = buildEditText()
+        methodChannel = MethodChannel(messenger, ChannelConst.CHANNEL_NAME)
+        attachTextWatcher()
+        attachFocusListener()
+    }
 
+    private fun buildEditText(): EditText {
+        return EditText(context).apply {
+            val initialText = creationParams?.get("initialText") as? String
+            initialText?.let { setText(it) }
+            hint = creationParams?.get(ChannelConst.ARG_HINT) as? String ?: ""
+            val textColor = parseColor(creationParams?.get("textColor"), Color.WHITE)
+            setTextColor(textColor)
+            setHintTextColor(textColor)
+            val bgColor = parseColor(creationParams?.get("backgroundColor"), Color.BLACK)
+            setBackgroundColor(bgColor)
+            val obscureText = creationParams?.get(ChannelConst.ARG_OBSCURE_TEXT) as? Boolean ?: false
+            applyObscureMode(obscureText)
             val maxLines = creationParams?.get("maxLines") as? Int ?: 1
             setLines(maxLines)
+            imeOptions = EditorInfo.IME_ACTION_DONE
+            setOnEditorActionListener(::handleEditorSubmit)
         }
+    }
 
-        // 使用统一的MethodChannel
-        methodChannel = MethodChannel(messenger, "native_textfield_tv")
+    private fun parseColor(rawValue: Any?, defaultColor: Int): Int {
+        return when (rawValue) {
+            is Int -> rawValue
+            is Long -> rawValue.toInt()
+            else -> defaultColor
+        }
+    }
 
-        // 添加文本变化监听器
-        editText.addTextChangedListener(object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-            
+    private fun handleEditorSubmit(v: TextView, actionId: Int, event: KeyEvent?): Boolean {
+        if (actionId == EditorInfo.IME_ACTION_DONE) {
+            methodChannel.invokeMethod(
+                ChannelConst.EVENT_SUBMITTED,
+                mapOf(
+                    ChannelConst.ARG_INSTANCE_ID to instanceId,
+                    ChannelConst.ARG_TEXT to editText.text.toString()
+                )
+            )
+            return true
+        }
+        return false
+    }
+
+    private fun attachTextWatcher() {
+        textWatcher = object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
             override fun afterTextChanged(s: Editable?) {
-                // 通知Flutter文本已变化
-                val instanceId = creationParams?.get("instanceId") as? Int
-                methodChannel.invokeMethod("onTextChanged", mapOf(
-                    "instanceId" to instanceId,
-                    "text" to s.toString()
-                ))
+                methodChannel.invokeMethod(
+                    "onTextChanged",
+                    mapOf(
+                        ChannelConst.ARG_INSTANCE_ID to instanceId,
+                        ChannelConst.ARG_TEXT to s.toString()
+                    )
+                )
             }
-        })
+        }
+        editText.addTextChangedListener(textWatcher)
+    }
 
-        // 设置焦点变化监听器
+    private fun attachFocusListener() {
         editText.setOnFocusChangeListener { _, hasFocus ->
-            val instanceId = creationParams?.get("instanceId") as? Int
-            methodChannel.invokeMethod("onFocusChanged", mapOf(
-                "instanceId" to instanceId,
-                "hasFocus" to hasFocus
-            ))
+            methodChannel.invokeMethod(
+                "onFocusChanged",
+                mapOf(
+                    ChannelConst.ARG_INSTANCE_ID to instanceId,
+                    "hasFocus" to hasFocus
+                )
+            )
         }
     }
 
-    override fun getView(): View {
-        return editText
+    private fun applyObscureMode(obscure: Boolean) {
+        Log.d(tag, "update obscureText = $obscure")
+        val cursorPos = editText.selectionStart
+        val inputBase = android.text.InputType.TYPE_CLASS_TEXT
+        val passwordFlag = android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+        editText.transformationMethod = if (obscure) PasswordTransformationMethod.getInstance() else null
+        editText.inputType = if (obscure) inputBase or passwordFlag else inputBase
+        editText.setSelection(cursorPos)
+        Log.d(tag, "obscure updated, cursor = $cursorPos")
     }
 
-    override fun dispose() {
-        // 清理资源
-    }
-
-    // 添加必要的方法来支持 Flutter 端的调用
     fun setText(text: String) {
         editText.setText(text)
     }
 
-    fun getText(): String {
-        return editText.text.toString()
-    }
+    fun getText(): String = editText.text.toString()
 
     fun requestFocus() {
         editText.requestFocus()
@@ -111,19 +139,34 @@ class NativeTextfieldTvView(
         editText.hint = hint
     }
 
+    fun setTextColorFlutter(color: Int) {
+        editText.setTextColor(color)
+        editText.setHintTextColor(color)
+    }
+
+    fun setBackgroundColorFlutter(color: Int) {
+        editText.setBackgroundColor(color)
+    }
+
+    fun setObscureText(obscure: Boolean) {
+        editText.post { applyObscureMode(obscure) }
+    }
+
     fun moveCursor(direction: String) {
         val pos = editText.selectionStart
         when (direction) {
-            "left" -> {
-                if (pos > 0) {
-                    editText.setSelection(pos - 1)
-                }
-            }
-            "right" -> {
-                if (pos < (editText.text?.length ?: 0)) {
-                    editText.setSelection(pos + 1)
-                }
-            }
+            ChannelConst.CURSOR_LEFT -> if (pos > 0) editText.setSelection(pos - 1)
+            ChannelConst.CURSOR_RIGHT -> if (pos < editText.text.length) editText.setSelection(pos + 1)
         }
     }
-} 
+
+    override fun getView(): View = editText
+
+    override fun dispose() {
+        plugin.removeViewInstance(instanceId)
+        editText.setOnEditorActionListener(null)
+        editText.setOnFocusChangeListener(null)
+        textWatcher?.let { editText.removeTextChangedListener(it) }
+        methodChannel.setMethodCallHandler(null)
+    }
+}

@@ -15,7 +15,6 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   String _platformVersion = 'Unknown';
-  String _textContent = '';
 
   final FocusNode _firstTextFieldFocus = FocusNode();
   final FocusNode _secondTextFieldFocus = FocusNode();
@@ -23,7 +22,7 @@ class _MyAppState extends State<MyApp> {
 
   // 使用同一个 controller 管理多个文本框，并设置初始文本
   final NativeTextFieldController _sharedController = NativeTextFieldController(text: '共享初始文本');
-  
+
   // 独立的 controller
   final NativeTextFieldController _independentController = NativeTextFieldController(text: '独立初始文本');
 
@@ -36,8 +35,7 @@ class _MyAppState extends State<MyApp> {
   Future<void> initPlatformState() async {
     String platformVersion;
     try {
-      platformVersion = await NativeTextfieldTv().getPlatformVersion() ??
-          'Unknown platform version';
+      platformVersion = await NativeTextfieldTv().getPlatformVersion() ?? 'Unknown platform version';
     } on PlatformException {
       platformVersion = 'Failed to get platform version.';
     }
@@ -92,7 +90,7 @@ class _MyAppState extends State<MyApp> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Shared Controller Demo (多个文本框共享同一个controller)',
+                        'Shared Controller Demo ',
                         style: Theme.of(context).textTheme.titleLarge,
                       ),
                       const SizedBox(height: 16),
@@ -100,53 +98,47 @@ class _MyAppState extends State<MyApp> {
                         children: [
                           ElevatedButton.icon(
                             onPressed: () {
-                              _sharedController.setText('共享文本更新');
-                              setState(() {
-                                _textContent = _sharedController.text;
-                              });
+                              _sharedController.setText('Test Text');
+                              setState(() {});
                             },
                             icon: const Icon(Icons.edit),
-                            label: const Text('更新共享文本'),
+                            label: const Text('Testing'),
                           ),
                           const SizedBox(width: 10),
                           ElevatedButton.icon(
                             onPressed: () {
                               _sharedController.clear();
-                              setState(() {
-                                _textContent = _sharedController.text;
-                              });
+                              setState(() {});
                             },
                             icon: const Icon(Icons.clear),
-                            label: const Text('清空共享文本'),
+                            label: const Text('Testing 2'),
                           ),
                           const SizedBox(width: 10),
                           ElevatedButton.icon(
                             onPressed: () {
-                              _sharedController.setText('测试同步');
-                              setState(() {
-                                _textContent = _sharedController.text;
-                              });
+                              _sharedController.setText('Testing Here');
+                              setState(() {});
                             },
                             icon: const Icon(Icons.sync),
-                            label: const Text('测试同步'),
+                            label: const Text('This is For Testing'),
                           ),
                         ],
                       ),
                       const SizedBox(height: 16),
-                      Text('共享Controller的文本框1:'),
-                      DpadNativeTextField(
+                      Text('TextField1:'),
+                      AndroidTVTextField(
                         focusNode: _firstTextFieldFocus,
                         controller: _sharedController,
                       ),
                       const SizedBox(height: 16),
-                      Text('共享Controller的文本框2:'),
-                      DpadNativeTextField(
+                      Text('TextField2:'),
+                      AndroidTVTextField(
                         focusNode: _secondTextFieldFocus,
                         controller: _sharedController,
                       ),
                       const SizedBox(height: 16),
-                      Text('独立Controller的文本框:'),
-                      DpadNativeTextField(
+                      Text('TextField3:'),
+                      AndroidTVTextField(
                         focusNode: _thirdTextFieldFocus,
                         controller: _independentController,
                       ),
@@ -158,7 +150,7 @@ class _MyAppState extends State<MyApp> {
                               _firstTextFieldFocus.requestFocus();
                             },
                             icon: const Icon(Icons.keyboard),
-                            label: const Text('焦点到共享文本框1'),
+                            label: const Text('Testing'),
                           ),
                           const SizedBox(width: 10),
                           ElevatedButton.icon(
@@ -166,7 +158,7 @@ class _MyAppState extends State<MyApp> {
                               _secondTextFieldFocus.requestFocus();
                             },
                             icon: const Icon(Icons.keyboard),
-                            label: const Text('焦点到共享文本框2'),
+                            label: const Text('Testing'),
                           ),
                           const SizedBox(width: 10),
                           ElevatedButton.icon(
@@ -174,14 +166,10 @@ class _MyAppState extends State<MyApp> {
                               _thirdTextFieldFocus.requestFocus();
                             },
                             icon: const Icon(Icons.keyboard),
-                            label: const Text('焦点到独立文本框'),
+                            label: const Text('Testing'),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 16),
-                      Text('共享Controller当前文本: $_textContent'),
-                      const SizedBox(height: 8),
-                      Text('独立Controller当前文本: ${_independentController.text}'),
                     ],
                   ),
                 ),

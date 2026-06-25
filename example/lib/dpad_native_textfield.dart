@@ -23,8 +23,6 @@ class DpadNativeTextField extends StatefulWidget {
 }
 
 class _DpadNativeTextFieldState extends State<DpadNativeTextField> {
-  // DpadTextField or textField has focus
-  // TODO :use widget.focusNode.hasPrimaryFocus
   bool _wapperhasFocus = false;
   bool blockNextFocusChange = false;
   bool _textFieldhasFocus = false;
@@ -66,20 +64,16 @@ class _DpadNativeTextFieldState extends State<DpadNativeTextField> {
           if (event.logicalKey.keyLabel == keyCenter && !_textFieldhasFocus) {
             _textFieldhasFocus = true;
             FocusScope.of(context).nextFocus();
-          } else if (event.logicalKey.keyLabel == keyDown &&
-              !_textFieldhasFocus) {
+          } else if (event.logicalKey.keyLabel == keyDown && !_textFieldhasFocus) {
             _textFieldhasFocus = false;
-          } else if (event.logicalKey.keyLabel == keyUp &&
-              !_textFieldhasFocus) {
+          } else if (event.logicalKey.keyLabel == keyUp && !_textFieldhasFocus) {
             _textFieldhasFocus = false;
-          } else if (event.logicalKey.keyLabel == keyCenter &&
-              _textFieldhasFocus) {
+          } else if (event.logicalKey.keyLabel == keyCenter && _textFieldhasFocus) {
             SystemChannels.textInput.invokeMethod('TextInput.show');
           } else if (event.logicalKey.keyLabel == keyUp && _textFieldhasFocus) {
             _textFieldhasFocus = false;
             widget.focusNode.requestFocus();
-          } else if (event.logicalKey.keyLabel == keyDown &&
-              _textFieldhasFocus) {
+          } else if (event.logicalKey.keyLabel == keyDown && _textFieldhasFocus) {
             _textFieldhasFocus = false;
             widget.focusNode.requestFocus();
           }
