@@ -231,7 +231,7 @@ class AndroidTVTextField extends StatefulWidget {
   final bool showPasswordToggle;
   final ValueChanged<String>? onSubmitted;
   final Widget? postFixWidget;
-
+  final Widget Function(Widget child)? builder;
   const AndroidTVTextField(
       {super.key,
       required this.focusNode,
@@ -246,7 +246,9 @@ class AndroidTVTextField extends StatefulWidget {
       this.onSubmitted,
       this.focuesedBorderColor = Colors.transparent,
       this.unFocuesedBorderColor = Colors.transparent,
-      this.postFixWidget});
+      this.postFixWidget,
+      this.builder, 
+      });
 
   @override
   State<AndroidTVTextField> createState() => _DpadNativeTextFieldState();
@@ -282,6 +284,47 @@ class _DpadNativeTextFieldState extends State<AndroidTVTextField> {
 
   @override
   Widget build(BuildContext context) {
+    Widget content = Row(
+      children: [
+        Expanded(
+          child: NativeTextField(
+            key: _nativeTextFieldKey,
+            controller: widget.controller,
+            height: widget.height,
+            obscureText: widget.obscureText,
+            hint: widget.hint,
+            maxLines: widget.maxLines,
+            backgroundColor: widget.backgroundColor,
+            textColor: widget.textColor,
+            onSubmitted: widget.onSubmitted,
+          ),
+        ),
+        if (widget.postFixWidget != null) ...[
+          const SizedBox(width: 10),
+          widget.postFixWidget!,
+        ],
+      ],
+    );
+  
+    Widget innerWidget;
+    if (widget.builder != null) {
+      innerWidget = widget.builder!(content);
+    } else {
+      innerWidget = Container(
+        height: widget.height,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(10),
+          color: widget.backgroundColor,
+          border: Border.all(
+            color: widget.focusNode.hasFocus ? Colors.green : Colors.amber,
+            width: 1,
+          ),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        child: content,
+      );
+    }
+  
     return KeyboardListener(
       focusNode: widget.focusNode,
       onKeyEvent: (event) {
@@ -296,38 +339,7 @@ class _DpadNativeTextFieldState extends State<AndroidTVTextField> {
           }
         }
       },
-      child: Stack(
-        alignment: Alignment.centerRight,
-        children: [
-          Builder(builder: (context) {
-            return Container(
-              height: widget.height,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(10),
-                color: widget.backgroundColor,
-                border: Border.all(
-                  color: widget.focusNode.hasFocus ? Colors.green : Colors.amber,
-                  width: 1,
-                ),
-              ),
-              padding: EdgeInsets.only(left: 5, right: widget.postFixWidget == null ? 5 : 50, top: 5, bottom: 5),
-              child: NativeTextField(
-                key: _nativeTextFieldKey,
-                controller: widget.controller,
-                width: double.infinity,
-                height: widget.height,
-                obscureText: widget.obscureText,
-                hint: widget.hint,
-                maxLines: widget.maxLines,
-                backgroundColor: widget.backgroundColor,
-                textColor: widget.textColor,
-                onSubmitted: widget.onSubmitted,
-              ),
-            );
-          }),
-          Positioned(right: 10, child: widget.postFixWidget ?? SizedBox()),
-        ],
-      ),
+      child: innerWidget,
     );
   }
 }
